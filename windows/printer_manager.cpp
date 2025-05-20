@@ -646,7 +646,7 @@ flutter::EncodableMap PrinterManager::GetPaperSizeDetails(const std::string& pri
             flutter::EncodableValue(static_cast<int>(pDevMode->dmPaperWidth));
         }
         
-        // For getting paper information, it's better to use a device context
+        // For getting paper information, use a device context
         HDC hDC = CreateDC(L"WINSPOOL", widePrinterName.c_str(), NULL, NULL);
         if (hDC) {
           // Get number of available paper sizes
