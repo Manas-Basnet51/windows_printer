@@ -20,9 +20,9 @@ class WindowsPrinter {
   }
 
   /// Set paper size for a printer
-  static Future<bool> setPaperSize(String printerName, int paperSizeId) {
-    return WindowsPrinterPlatform.instance.setPaperSize(printerName, paperSizeId);
-  }
+  // static Future<bool> setPaperSize(String printerName, int paperSizeId) {
+  //   return WindowsPrinterPlatform.instance.setPaperSize(printerName, paperSizeId);
+  // }
 
   /// Print raw data (useful for receipt/thermal printers)
   static Future<bool> printRawData({
@@ -54,9 +54,9 @@ class WindowsPrinter {
   }
 
   /// Get printer device settings
-  static Future<Map<String, dynamic>> getPrinterDeviceSettings(String printerName) {
-    return WindowsPrinterPlatform.instance.getPrinterDeviceSettings(printerName);
-  }
+  // static Future<Map<String, dynamic>> getPrinterDeviceSettings(String printerName) {
+  //   return WindowsPrinterPlatform.instance.getPrinterDeviceSettings(printerName);
+  // }
 
   /// Open printer properties dialog
   static Future<bool> openPrinterProperties(String printerName) {
@@ -64,7 +64,7 @@ class WindowsPrinter {
   }
 
   /// Set printer quality
-  static Future<bool> setPrinterQuality(String printerName, int quality) {
-    return WindowsPrinterPlatform.instance.setPrinterQuality(printerName, quality);
-  }
+  // static Future<bool> setPrinterQuality(String printerName, int quality) {
+  //   return WindowsPrinterPlatform.instance.setPrinterQuality(printerName, quality);
+  // }
 }

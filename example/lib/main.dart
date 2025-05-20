@@ -98,33 +98,6 @@ class _PrinterPageState extends State<PrinterPage> {
     }
   }
 
-  Future<void> _setPaperSize(int paperSizeId) async {
-    if (_selectedPrinter == null) return;
-
-    setState(() {
-      _loading = true;
-      _status = 'Setting paper size...';
-    });
-
-    try {
-      final success = await WindowsPrinter.setPaperSize(_selectedPrinter!, paperSizeId);
-      
-      // Reload paper size details
-      final paperDetails = await WindowsPrinter.getPaperSizeDetails(_selectedPrinter!);
-      
-      setState(() {
-        _paperSizeDetails = paperDetails;
-        _loading = false;
-        _status = success ? 'Paper size set successfully' : 'Failed to set paper size';
-      });
-    } catch (e) {
-      setState(() {
-        _loading = false;
-        _status = 'Error: $e';
-      });
-    }
-  }
-
   Future<void> _setDefaultPrinter() async {
     if (_selectedPrinter == null) return;
 
@@ -344,12 +317,6 @@ class _PrinterPageState extends State<PrinterPage> {
                                               'ID: ${paperSize["id"]}, '
                                               'Width: ${paperSize["width"]}, '
                                               'Height: ${paperSize["height"]}',
-                                            ),
-                                            trailing: ElevatedButton(
-                                              onPressed: isSelected
-                                                  ? null
-                                                  : () => _setPaperSize(paperSize["id"] as int),
-                                              child: const Text('Set'),
                                             ),
                                           ),
                                         );
