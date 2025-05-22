@@ -13,7 +13,7 @@ A comprehensive Flutter plugin for managing and interacting with printers on Win
 ## Requirements
 
 - Windows platform
-- Flutter 2.0.0 or higher
+- Flutter 3.0.0 or higher
 - Windows 10 or higher (recommended)
 
 ## Installation
