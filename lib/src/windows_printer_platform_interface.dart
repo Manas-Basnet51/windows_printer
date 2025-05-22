@@ -34,13 +34,11 @@ abstract class WindowsPrinterPlatform extends PlatformInterface {
   /// Get detailed paper size information for a printer
   Future<Map<String, dynamic>> getPaperSizeDetails(String printerName);
 
-  /// Set paper size for a printer
-  Future<bool> setPaperSize(String printerName, int paperSizeId);
-
-  /// Print raw data (useful for receipt/thermal printers)
+  /// Print raw data with datatype control
   Future<bool> printRawData({
     String? printerName,
     required Uint8List data,
+    bool useRawDatatype = true, // true=RAW (thermal), false=TEXT (regular)
   });
 
   /// Print PDF data
@@ -53,12 +51,14 @@ abstract class WindowsPrinterPlatform extends PlatformInterface {
   /// Set default printer
   Future<bool> setDefaultPrinter(String printerName);
 
-  /// Get printer device settings
-  Future<Map<String, dynamic>> getPrinterDeviceSettings(String printerName);
-
   /// Open printer properties dialog
   Future<bool> openPrinterProperties(String printerName);
 
-  /// Set printer quality
-  Future<bool> setPrinterQuality(String printerName, int quality);
+  /// Print rich text document with inline formatting
+  Future<bool> printRichTextDocument({
+    required String printerName,
+    required String content,
+    String fontName = 'Courier New',
+    int fontSize = 12,
+  });
 }

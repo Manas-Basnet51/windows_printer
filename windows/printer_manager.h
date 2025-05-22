@@ -4,6 +4,7 @@
 #include <flutter/standard_method_codec.h>
 #include <string>
 #include <vector>
+#include <windows.h>
 
 // Class that encapsulates all printer-related functionality
 class PrinterManager {
@@ -17,26 +18,26 @@ public:
   /// Get paper size details
   static flutter::EncodableMap GetPaperSizeDetails(const std::string& printerName);
   
-  // Set paper size
-  static bool SetPaperSize(const std::string& printerName, int paperSizeId);
-  
-  /// Print raw data
-  static bool PrintRawData(const std::string& printerName, const std::vector<uint8_t>& data);
+  /// Print raw data(useful for receipt/thermal printers)
+  static bool PrintRawData(const std::string& printerName, 
+                          const std::vector<uint8_t>& data, 
+                          bool useRawDatatype = true);
   
   /// Print PDF data
   static bool PrintPdf(const std::string& printerName, const std::vector<uint8_t>& data, int copies = 1);
   
-  /// Get printer device settings
-  static flutter::EncodableMap GetPrinterDeviceSettings(const std::string& printerName);
   
-  /// Set default printer
+  /// Set as default printer
   static bool AssignDefaultPrinter(const std::string& printerName);
   
-  /// Open printer properties dialog
+  /// Open printer properties dialog screen
   static bool OpenPrinterProperties(const std::string& printerName);
-  
-  /// Set printer quality
-  static bool SetPrinterQuality(const std::string& printerName, int quality);
+
+  /// Print rich text (use symbols *, #, **,....)
+  static bool PrintRichTextDocument(const std::string& printerName, 
+                                    const std::string& richTextContent,
+                                    const std::string& defaultFontName = "Courier New",
+                                    int defaultFontSize = 12);
 
 private:
   /// Helper function to convert wide string to UTF-8
@@ -44,6 +45,11 @@ private:
   
   /// Helper function to convert UTF-8 to wide string
   static std::wstring Utf8ToWide(const std::string& utf8_str);
+
+  /// Helper function to parse and print a line with formatting
+  static void ParseAndPrintLine(HDC hDC, const std::string& line, int x, int y,
+                               HFONT normalFont, HFONT boldFont, HFONT italicFont, 
+                               HFONT boldItalicFont, HFONT largeFont, int* lineHeight);
 };
 
 #endif // FLUTTER_PLUGIN_PRINTER_MANAGER_H_

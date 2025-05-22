@@ -6,6 +6,8 @@
 #include <vector>
 #include <optional>
 #include <fstream>
+#include <sstream>
+#include <string>
 
 // Helper function to convert wide string to UTF-8
 std::string PrinterManager::WideToUtf8(const wchar_t* wide_str) {
@@ -37,7 +39,7 @@ std::wstring PrinterManager::Utf8ToWide(const std::string& utf8_str) {
   return wide_str;
 }
 
-// Get list of available printers
+// GetAvailablePrinters Implementation
 flutter::EncodableList PrinterManager::GetAvailablePrinters() {
   flutter::EncodableList printerList;
   
@@ -59,14 +61,13 @@ flutter::EncodableList PrinterManager::GetAvailablePrinters() {
   return printerList;
 }
 
-// Get printer properties
+// GetPrinterProperties implementation
 flutter::EncodableMap PrinterManager::GetPrinterProperties(const std::string& printerName) {
   flutter::EncodableMap properties;
   HANDLE hPrinter = NULL;
   PRINTER_INFO_2* pPrinterInfo = NULL;
   DWORD needed = 0;
   
-  // Convert printer name to wide string
   std::wstring widePrinterName = Utf8ToWide(printerName);
   
   // Check if this is the default printer
@@ -82,7 +83,7 @@ flutter::EncodableMap PrinterManager::GetPrinterProperties(const std::string& pr
   
   // Open printer
   if (!OpenPrinter(const_cast<LPWSTR>(widePrinterName.c_str()), &hPrinter, NULL)) {
-    // Return error info if we can't open the printer
+    // Error info if we can't open the printer
     properties[flutter::EncodableValue("error")] = flutter::EncodableValue("Failed to open printer");
     return properties;
   }
@@ -285,233 +286,20 @@ flutter::EncodableMap PrinterManager::GetPrinterProperties(const std::string& pr
   return properties;
 }
 
-// Function to get printer device settings
-flutter::EncodableMap PrinterManager::GetPrinterDeviceSettings(const std::string& printerName) {
-  flutter::EncodableMap deviceSettings;
-  HANDLE hPrinter = NULL;
-  
-  // Convert printer name to wide string
-  std::wstring widePrinterName = Utf8ToWide(printerName);
-  
-  // Open printer
-  if (!OpenPrinter(const_cast<LPWSTR>(widePrinterName.c_str()), &hPrinter, NULL)) {
-    deviceSettings[flutter::EncodableValue("error")] = flutter::EncodableValue("Failed to open printer");
-    return deviceSettings;
-  }
-  
-  // Get the printer information
-  DWORD needed = 0;
-  GetPrinter(hPrinter, 2, NULL, 0, &needed);
-  
-  if (needed > 0) {
-    std::vector<BYTE> buffer(needed);
-    
-    if (GetPrinter(hPrinter, 2, buffer.data(), needed, &needed)) {
-      // Get the device mode
-      LONG result = DocumentProperties(
-        NULL, 
-        hPrinter, 
-        const_cast<LPWSTR>(widePrinterName.c_str()),
-        NULL, 
-        NULL, 
-        0
-      );
-      
-      if (result > 0) {
-        // Allocate memory for the DEVMODE structure
-        DEVMODE* pDevMode = (DEVMODE*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, result);
-        
-        if (pDevMode) {
-          // Get the current device settings
-          DocumentProperties(
-            NULL, 
-            hPrinter, 
-            const_cast<LPWSTR>(widePrinterName.c_str()),
-            pDevMode, 
-            NULL, 
-            DM_OUT_BUFFER
-          );
-          
-          // Extract basic device settings
-          if (pDevMode->dmFields & DM_PAPERSIZE) {
-            deviceSettings[flutter::EncodableValue("paperSize")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmPaperSize));
-          }
-          
-          if (pDevMode->dmFields & DM_PAPERWIDTH) {
-            deviceSettings[flutter::EncodableValue("paperWidth")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmPaperWidth));
-          }
-          
-          if (pDevMode->dmFields & DM_PAPERLENGTH) {
-            deviceSettings[flutter::EncodableValue("paperLength")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmPaperLength));
-          }
-          
-          if (pDevMode->dmFields & DM_ORIENTATION) {
-            deviceSettings[flutter::EncodableValue("orientation")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmOrientation));
-            
-            // Convert orientation to string
-            if (pDevMode->dmOrientation == DMORIENT_PORTRAIT) {
-              deviceSettings[flutter::EncodableValue("orientationName")] = 
-                flutter::EncodableValue("Portrait");
-            } else if (pDevMode->dmOrientation == DMORIENT_LANDSCAPE) {
-              deviceSettings[flutter::EncodableValue("orientationName")] = 
-                flutter::EncodableValue("Landscape");
-            }
-          }
-          
-          if (pDevMode->dmFields & DM_COPIES) {
-            deviceSettings[flutter::EncodableValue("copies")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmCopies));
-          }
-          
-          if (pDevMode->dmFields & DM_DEFAULTSOURCE) {
-            deviceSettings[flutter::EncodableValue("defaultSource")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmDefaultSource));
-            
-            // Convert paper source to string
-            std::string sourceName = "Unknown";
-            switch (pDevMode->dmDefaultSource) {
-              case DMBIN_UPPER:
-                sourceName = "Upper Tray";
-                break;
-              case DMBIN_LOWER:
-                sourceName = "Lower Tray";
-                break;
-              case DMBIN_MIDDLE:
-                sourceName = "Middle Tray";
-                break;
-              case DMBIN_MANUAL:
-                sourceName = "Manual Feed";
-                break;
-              case DMBIN_ENVELOPE:
-                sourceName = "Envelope Feed";
-                break;
-              case DMBIN_ENVMANUAL:
-                sourceName = "Envelope Manual Feed";
-                break;
-              case DMBIN_AUTO:
-                sourceName = "Auto Select";
-                break;
-              case DMBIN_TRACTOR:
-                sourceName = "Tractor Feed";
-                break;
-              case DMBIN_SMALLFMT:
-                sourceName = "Small Format";
-                break;
-              case DMBIN_LARGEFMT:
-                sourceName = "Large Format";
-                break;
-              case DMBIN_LARGECAPACITY:
-                sourceName = "Large Capacity";
-                break;
-              case DMBIN_CASSETTE:
-                sourceName = "Cassette";
-                break;
-              case DMBIN_FORMSOURCE:
-                sourceName = "Form Source";
-                break;
-            }
-            deviceSettings[flutter::EncodableValue("defaultSourceName")] = 
-              flutter::EncodableValue(sourceName);
-          }
-          
-          if (pDevMode->dmFields & DM_PRINTQUALITY) {
-            deviceSettings[flutter::EncodableValue("printQuality")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmPrintQuality));
-            
-            // Convert print quality to string
-            std::string qualityName = "Unknown";
-            switch (pDevMode->dmPrintQuality) {
-              case DMRES_DRAFT:
-                qualityName = "Draft";
-                break;
-              case DMRES_LOW:
-                qualityName = "Low";
-                break;
-              case DMRES_MEDIUM:
-                qualityName = "Medium";
-                break;
-              case DMRES_HIGH:
-                qualityName = "High";
-                break;
-              default:
-                if (pDevMode->dmPrintQuality > 0) {
-                  qualityName = std::to_string(pDevMode->dmPrintQuality) + " DPI";
-                }
-            }
-            deviceSettings[flutter::EncodableValue("printQualityName")] = 
-              flutter::EncodableValue(qualityName);
-          }
-          
-          if (pDevMode->dmFields & DM_DUPLEX) {
-            deviceSettings[flutter::EncodableValue("duplex")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmDuplex));
-            
-            // Convert duplex to string
-            std::string duplexName = "Unknown";
-            switch (pDevMode->dmDuplex) {
-              case DMDUP_SIMPLEX:
-                duplexName = "Single-sided";
-                break;
-              case DMDUP_VERTICAL:
-                duplexName = "Duplex (Flip on Long Edge)";
-                break;
-              case DMDUP_HORIZONTAL:
-                duplexName = "Duplex (Flip on Short Edge)";
-                break;
-            }
-            deviceSettings[flutter::EncodableValue("duplexName")] = 
-              flutter::EncodableValue(duplexName);
-          }
-          
-          if (pDevMode->dmFields & DM_COLLATE) {
-            deviceSettings[flutter::EncodableValue("collate")] = 
-              flutter::EncodableValue(static_cast<int>(pDevMode->dmCollate));
-            
-            // Convert collate to string
-            std::string collateName = "Unknown";
-            switch (pDevMode->dmCollate) {
-              case DMCOLLATE_FALSE:
-                collateName = "Uncollated";
-                break;
-              case DMCOLLATE_TRUE:
-                collateName = "Collated";
-                break;
-            }
-            deviceSettings[flutter::EncodableValue("collateName")] = 
-              flutter::EncodableValue(collateName);
-          }
-          
-          // Free the allocated memory
-          HeapFree(GetProcessHeap(), 0, pDevMode);
-        }
-      }
-    }
-  }
-  
-  // Close the printer handle
-  ClosePrinter(hPrinter);
-  
-  return deviceSettings;
-}
-
-// Set default printer
+// AssignDefaultPrinter Implementation
 bool PrinterManager::AssignDefaultPrinter(const std::string& printerName) {
   std::wstring widePrinterName = Utf8ToWide(printerName);
   return SetDefaultPrinter(widePrinterName.c_str()) ? true : false;
 }
 
-// Open printer properties dialog
+// OpenPrinterProperties Implementation
 bool PrinterManager::OpenPrinterProperties(const std::string& printerName) {
   std::wstring widePrinterName = Utf8ToWide(printerName);
   
-  // Build the command to open the printer properties
+  // Command to open the printer properties
   std::wstring command = L"rundll32.exe printui.dll,PrintUIEntry /p /n\"" + widePrinterName + L"\"";
   
-  // Execute the command
+  // Execute cmd
   HINSTANCE hInstance = ShellExecuteW(
     NULL,
     L"open",
@@ -523,76 +311,6 @@ bool PrinterManager::OpenPrinterProperties(const std::string& printerName) {
   
   // Check if the command was executed successfully
   return ((INT_PTR)hInstance > 32);
-}
-
-// Set printer quality
-bool PrinterManager::SetPrinterQuality(const std::string& printerName, int quality) {
-  // Convert printer name to wide string
-  std::wstring widePrinterName = Utf8ToWide(printerName);
-  
-  // Open printer
-  HANDLE hPrinter = NULL;
-  if (!OpenPrinter(const_cast<LPWSTR>(widePrinterName.c_str()), &hPrinter, NULL)) {
-    return false;
-  }
-  
-  // Get the current device mode size
-  LONG devModeSize = DocumentProperties(
-    NULL, 
-    hPrinter, 
-    const_cast<LPWSTR>(widePrinterName.c_str()), 
-    NULL, 
-    NULL, 
-    0
-  );
-  
-  if (devModeSize <= 0) {
-    ClosePrinter(hPrinter);
-    return false;
-  }
-  
-  // Allocate memory for the device mode
-  DEVMODE* pDevMode = (DEVMODE*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, devModeSize);
-  if (!pDevMode) {
-    ClosePrinter(hPrinter);
-    return false;
-  }
-  
-  // Get the current settings
-  LONG getResult = DocumentProperties(
-    NULL, 
-    hPrinter, 
-    const_cast<LPWSTR>(widePrinterName.c_str()), 
-    pDevMode, 
-    NULL, 
-    DM_OUT_BUFFER
-  );
-  
-  if (getResult < 0) {
-    HeapFree(GetProcessHeap(), 0, pDevMode);
-    ClosePrinter(hPrinter);
-    return false;
-  }
-  
-  // Modify the quality setting
-  pDevMode->dmPrintQuality = static_cast<short>(quality);
-  pDevMode->dmFields |= DM_PRINTQUALITY;
-  
-  // Update the printer settings
-  LONG setResult = DocumentProperties(
-    NULL, 
-    hPrinter, 
-    const_cast<LPWSTR>(widePrinterName.c_str()), 
-    pDevMode, 
-    pDevMode, 
-    DM_IN_BUFFER | DM_OUT_BUFFER
-  );
-  
-  // Free resources
-  HeapFree(GetProcessHeap(), 0, pDevMode);
-  ClosePrinter(hPrinter);
-  
-  return (setResult >= 0);
 }
 
 // GetPaperSizeDetails implementation
@@ -630,7 +348,7 @@ flutter::EncodableMap PrinterManager::GetPaperSizeDetails(const std::string& pri
       );
       
       if (getResult >= 0) {
-        // Get current paper size information
+        // Current paper size information
         if (pDevMode->dmFields & DM_PAPERSIZE) {
           paperDetails[flutter::EncodableValue("currentPaperSize")] = 
             flutter::EncodableValue(static_cast<int>(pDevMode->dmPaperSize));
@@ -646,7 +364,6 @@ flutter::EncodableMap PrinterManager::GetPaperSizeDetails(const std::string& pri
             flutter::EncodableValue(static_cast<int>(pDevMode->dmPaperWidth));
         }
         
-        // For getting paper information, it's better to use a device context
         HDC hDC = CreateDC(L"WINSPOOL", widePrinterName.c_str(), NULL, NULL);
         if (hDC) {
           // Get number of available paper sizes
@@ -746,149 +463,10 @@ flutter::EncodableMap PrinterManager::GetPaperSizeDetails(const std::string& pri
   return paperDetails;
 }
 
-// SetPaperSize implementation
-bool PrinterManager::SetPaperSize(const std::string& printerName, int paperSizeId) {
-
-  // Convert printer name to wide string
-  std::wstring widePrinterName = Utf8ToWide(printerName);
-  
-  // Try multiple methods to set the paper size
-  bool success = false;
-  
-  // Method 1: Use DocumentProperties and SetPrinter together
-  HANDLE hPrinter = NULL;
-  if (OpenPrinter(const_cast<LPWSTR>(widePrinterName.c_str()), &hPrinter, NULL)) {
-    // Get printer info to determine which level to use for SetPrinter
-    DWORD needed = 0;
-    GetPrinter(hPrinter, 2, NULL, 0, &needed);
-    
-    if (needed > 0) {
-      std::vector<BYTE> buffer(needed);
-      PRINTER_INFO_2* pPrinterInfo = reinterpret_cast<PRINTER_INFO_2*>(buffer.data());
-      
-      if (GetPrinter(hPrinter, 2, buffer.data(), needed, &needed)) {
-        // Get the device mode size
-        LONG devModeSize = DocumentProperties(
-          NULL,
-          hPrinter,
-          const_cast<LPWSTR>(widePrinterName.c_str()),
-          NULL,
-          NULL,
-          0
-        );
-        
-        if (devModeSize > 0) {
-          // Allocate memory for the device mode
-          DEVMODE* pDevMode = (DEVMODE*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, devModeSize);
-          if (pDevMode) {
-            // Get the current settings
-            LONG getResult = DocumentProperties(
-              NULL,
-              hPrinter,
-              const_cast<LPWSTR>(widePrinterName.c_str()),
-              pDevMode,
-              NULL,
-              DM_OUT_BUFFER
-            );
-            
-            if (getResult >= 0) {
-              // Modify the paper size
-              pDevMode->dmPaperSize = static_cast<short>(paperSizeId);
-              pDevMode->dmFields |= DM_PAPERSIZE;
-              
-              // Update the settings
-              LONG setResult = DocumentProperties(
-                NULL,
-                hPrinter,
-                const_cast<LPWSTR>(widePrinterName.c_str()),
-                pDevMode,
-                pDevMode,
-                DM_IN_BUFFER | DM_OUT_BUFFER
-              );
-              
-              if (setResult >= 0) {
-                // Now set this as the default DevMode for the printer
-                pPrinterInfo->pDevMode = pDevMode;
-                SetPrinter(hPrinter, 2, (LPBYTE)pPrinterInfo, 0);
-                success = true;
-              }
-            }
-            
-            // Free the device mode memory
-            HeapFree(GetProcessHeap(), 0, pDevMode);
-          }
-        }
-      }
-    }
-    
-    // Close the printer handle
-    ClosePrinter(hPrinter);
-  }
-  
-  // Method 2: Use the DC approach if method 1 failed
-  if (!success) {
-    HDC hDC = CreateDC(L"WINSPOOL", widePrinterName.c_str(), NULL, NULL);
-    if (hDC) {
-      // Get the current DEVMODE
-      DEVMODE dm = {0};
-      dm.dmSize = sizeof(DEVMODE);
-      
-      if (EnumForms(hDC, 1, NULL, 0, NULL, NULL)) {
-        // Set paper size
-        dm.dmPaperSize = static_cast<short>(paperSizeId);
-        dm.dmFields = DM_PAPERSIZE;
-        
-        // Apply the changes
-        HDC newDC = ResetDC(hDC, &dm);
-        if (newDC != NULL) {
-          success = true;
-        }
-      }
-      
-      // Delete the DC
-      DeleteDC(hDC);
-    }
-  }
-  
-  // Method 3: If all else fails, use the rundll32 approach to modify printer properties
-  if (!success) {
-    // Format the command with the appropriate parameters to set paper size
-    std::wstring command = L"rundll32.exe printui.dll,PrintUIEntry /Xs /n\"" + 
-                          widePrinterName + L"\" paper=" + std::to_wstring(paperSizeId);
-    
-    // Execute the command
-    STARTUPINFOW si = {0};
-    si.cb = sizeof(STARTUPINFOW);
-    PROCESS_INFORMATION pi = {0};
-    
-    if (CreateProcessW(
-        NULL,                          // No module name (use command line)
-        const_cast<LPWSTR>(command.c_str()), // Command line
-        NULL,                          // Process handle not inheritable
-        NULL,                          // Thread handle not inheritable
-        FALSE,                         // Set handle inheritance to FALSE
-        0,                             // No creation flags
-        NULL,                          // Use parent's environment block
-        NULL,                          // Use parent's starting directory 
-        &si,                           // Pointer to STARTUPINFO structure
-        &pi                            // Pointer to PROCESS_INFORMATION structure
-    )) {
-      // Wait for the process to finish
-      WaitForSingleObject(pi.hProcess, 5000); // Wait up to 5 seconds
-      
-      // Close process and thread handles
-      CloseHandle(pi.hProcess);
-      CloseHandle(pi.hThread);
-      
-      success = true;
-    }
-  }
-  
-  return success;
-}
-
 // PrintRawData implementation
-bool PrinterManager::PrintRawData(const std::string& printerName, const std::vector<uint8_t>& data) {
+bool PrinterManager::PrintRawData(const std::string& printerName, 
+                                 const std::vector<uint8_t>& data, 
+                                 bool useRawDatatype) {
   std::string actualPrinterName = printerName;
   
   // If no printer name provided, use the default printer
@@ -902,10 +480,9 @@ bool PrinterManager::PrintRawData(const std::string& printerName, const std::vec
     }
   }
   
-  // Convert printer name to wide string
   std::wstring widePrinterName = Utf8ToWide(actualPrinterName);
   
-  // Open the printer
+  // Open printer
   HANDLE hPrinter = NULL;
   if (!OpenPrinter(const_cast<LPWSTR>(widePrinterName.c_str()), &hPrinter, NULL)) {
     return false;
@@ -914,25 +491,12 @@ bool PrinterManager::PrintRawData(const std::string& printerName, const std::vec
   // Get printer information to determine if it's a raw-capable printer
   DWORD needed = 0;
   GetPrinter(hPrinter, 2, NULL, 0, &needed);
-  bool isPosRawPrinter = false;
   
-  if (needed > 0) {
-    std::vector<BYTE> buffer(needed);
-    PRINTER_INFO_2* pPrinterInfo = reinterpret_cast<PRINTER_INFO_2*>(buffer.data());
-    
-    if (GetPrinter(hPrinter, 2, buffer.data(), needed, &needed)) {
-      // Check if printer supports RAW format (most receipt printers do)
-      if (pPrinterInfo->Attributes & PRINTER_ATTRIBUTE_RAW_ONLY) {
-        isPosRawPrinter = true;
-      }
-    }
-  }
-  
-  // Start a print job
+  // Start a print job with user-controlled data typ
   DOC_INFO_1 docInfo = {0};
   docInfo.pDocName = L"Raw Print Job";
   docInfo.pOutputFile = NULL;
-  docInfo.pDatatype = isPosRawPrinter ? L"RAW" : L"TEXT";
+  docInfo.pDatatype = useRawDatatype ? L"RAW" : L"TEXT";
   
   DWORD jobId = StartDocPrinter(hPrinter, 1, (LPBYTE)&docInfo);
   if (jobId == 0) {
@@ -994,14 +558,13 @@ bool PrinterManager::PrintPdf(const std::string& printerName, const std::vector<
   outFile.write(reinterpret_cast<const char*>(data.data()), data.size());
   outFile.close();
   
-  // Convert printer name and temp file to wide strings
   std::wstring widePrinterName = Utf8ToWide(actualPrinterName);
   std::wstring wideTempFile = Utf8ToWide(tempPdfFile);
   
-  // Build the command to print the PDF silently
+  // Command to print the PDF silently
   std::wstring command = L"rundll32.exe mshtml.dll,PrintHTML \"" + wideTempFile + L"\" \"" + widePrinterName + L"\"";
   
-  // Execute the command
+  // Execute cmd
   STARTUPINFOW si = {0};
   si.cb = sizeof(STARTUPINFOW);
   si.dwFlags = STARTF_USESHOWWINDOW;
@@ -1060,4 +623,227 @@ bool PrinterManager::PrintPdf(const std::string& printerName, const std::vector<
     
     return altSuccess;
   }
+}
+
+// PrintRichTextDocument Implementation
+bool PrinterManager::PrintRichTextDocument(const std::string& printerName, 
+                                          const std::string& richTextContent,
+                                          const std::string& defaultFontName,
+                                          int defaultFontSize) {
+  std::string actualPrinterName = printerName;
+  
+  if (actualPrinterName.empty()) {
+    WCHAR defaultPrinterName[256] = {0};
+    DWORD defaultPrinterSize = sizeof(defaultPrinterName) / sizeof(WCHAR);
+    if (GetDefaultPrinter(defaultPrinterName, &defaultPrinterSize)) {
+      actualPrinterName = WideToUtf8(defaultPrinterName);
+    } else {
+      return false;
+    }
+  }
+  
+  std::wstring widePrinterName = Utf8ToWide(actualPrinterName);
+  
+  // Use GDI for better font control
+  HDC hDC = CreateDC(L"WINSPOOL", widePrinterName.c_str(), NULL, NULL);
+  if (!hDC) return false;
+  
+  DOCINFO di = {0};
+  di.cbSize = sizeof(DOCINFO);
+  di.lpszDocName = L"Rich Text Document";
+  
+  if (StartDoc(hDC, &di) <= 0) {
+    DeleteDC(hDC);
+    return false;
+  }
+  
+  if (StartPage(hDC) <= 0) {
+    EndDoc(hDC);
+    DeleteDC(hDC);
+    return false;
+  }
+  
+  // Create different fonts
+  std::wstring wideFontName = Utf8ToWide(defaultFontName);
+  
+  HFONT normalFont = CreateFont(
+    -MulDiv(defaultFontSize, GetDeviceCaps(hDC, LOGPIXELSY), 72),
+    0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+    ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_MODERN, wideFontName.c_str());
+    
+  HFONT boldFont = CreateFont(
+    -MulDiv(defaultFontSize, GetDeviceCaps(hDC, LOGPIXELSY), 72),
+    0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+    ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_MODERN, wideFontName.c_str());
+    
+  HFONT italicFont = CreateFont(
+    -MulDiv(defaultFontSize, GetDeviceCaps(hDC, LOGPIXELSY), 72),
+    0, 0, 0, FW_NORMAL, TRUE, FALSE, FALSE,
+    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+    ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_MODERN, wideFontName.c_str());
+    
+  HFONT boldItalicFont = CreateFont(
+    -MulDiv(defaultFontSize, GetDeviceCaps(hDC, LOGPIXELSY), 72),
+    0, 0, 0, FW_BOLD, TRUE, FALSE, FALSE,
+    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+    ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_MODERN, wideFontName.c_str());
+    
+  HFONT largeFont = CreateFont(
+    -MulDiv(defaultFontSize + 6, GetDeviceCaps(hDC, LOGPIXELSY), 72),
+    0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+    ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_MODERN, wideFontName.c_str());
+
+  SetTextColor(hDC, RGB(0, 0, 0));
+  SetBkMode(hDC, TRANSPARENT);
+  
+  int yPos = 50;
+  int baseLineHeight = MulDiv(defaultFontSize + 2, GetDeviceCaps(hDC, LOGPIXELSY), 72);
+  
+  // parse rich text content 
+  std::stringstream ss(richTextContent);
+  std::string line;
+  
+  while (std::getline(ss, line)) {
+    int currentLineHeight = baseLineHeight;
+    ParseAndPrintLine(hDC, line, 50, yPos, normalFont, boldFont, italicFont, 
+                     boldItalicFont, largeFont, &currentLineHeight);
+    yPos += currentLineHeight;
+  }
+  
+  DeleteObject(normalFont);
+  DeleteObject(boldFont);
+  DeleteObject(italicFont);
+  DeleteObject(boldItalicFont);
+  DeleteObject(largeFont);
+  
+  EndPage(hDC);
+  EndDoc(hDC);
+  DeleteDC(hDC);
+  
+  return true;
+}
+
+// ParseAndPrintLine Implementation
+void PrinterManager::ParseAndPrintLine(HDC hDC, const std::string& line, int x, int y,
+                                       HFONT normalFont, HFONT boldFont, HFONT italicFont, 
+                                       HFONT boldItalicFont, HFONT largeFont, int* lineHeight) {
+  int currentX = x;
+  std::string currentText = "";
+  HFONT currentFont = normalFont;
+  bool isBold = false;
+  bool isItalic = false;
+  bool isLarge = false;
+  int maxHeight = *lineHeight;
+  
+  for (size_t i = 0; i < line.length(); ++i) {
+    // Check for bold markers (**)
+    if (i + 1 < line.length() && line.substr(i, 2) == "**") {
+      // Print current text before changing format
+      if (!currentText.empty()) {
+        SelectObject(hDC, currentFont);
+        std::wstring wideText = Utf8ToWide(currentText);
+        TextOut(hDC, currentX, y, wideText.c_str(), static_cast<int>(wideText.length()));
+        
+        SIZE textSize;
+        GetTextExtentPoint32(hDC, wideText.c_str(), static_cast<int>(wideText.length()), &textSize);
+        currentX += textSize.cx;
+        currentText = "";
+      }
+      
+      // Toggle bold
+      isBold = !isBold;
+      
+      // Update font based on current state
+      if (isLarge) {
+        currentFont = largeFont; // Large font is always bold
+      } else if (isBold && isItalic) {
+        currentFont = boldItalicFont;
+      } else if (isBold) {
+        currentFont = boldFont;
+      } else if (isItalic) {
+        currentFont = italicFont;
+      } else {
+        currentFont = normalFont;
+      }
+      
+      i++; // Skip second *
+      continue;
+    }
+    
+    // Check for italic markers (*)
+    if (line.substr(i, 1) == "*" && (i == 0 || line[i-1] != '*') && 
+        (i + 1 >= line.length() || line[i+1] != '*')) {
+      // Print current text before changing format
+      if (!currentText.empty()) {
+        SelectObject(hDC, currentFont);
+        std::wstring wideText = Utf8ToWide(currentText);
+        TextOut(hDC, currentX, y, wideText.c_str(), static_cast<int>(wideText.length()));
+        
+        SIZE textSize;
+        GetTextExtentPoint32(hDC, wideText.c_str(), static_cast<int>(wideText.length()), &textSize);
+        currentX += textSize.cx;
+        currentText = "";
+      }
+      
+      // Toggle italic
+      isItalic = !isItalic;
+      
+      // Update font based on current state
+      if (isLarge) {
+        currentFont = largeFont; // Large font is always bold
+      } else if (isBold && isItalic) {
+        currentFont = boldItalicFont;
+      } else if (isBold) {
+        currentFont = boldFont;
+      } else if (isItalic) {
+        currentFont = italicFont;
+      } else {
+        currentFont = normalFont;
+      }
+      
+      continue;
+    }
+    
+    // Check for large text markers (##)
+    if (i + 1 < line.length() && line.substr(i, 2) == "##") {
+      // Print current text before changing format
+      if (!currentText.empty()) {
+        SelectObject(hDC, currentFont);
+        std::wstring wideText = Utf8ToWide(currentText);
+        TextOut(hDC, currentX, y, wideText.c_str(), static_cast<int>(wideText.length()));
+        
+        SIZE textSize;
+        GetTextExtentPoint32(hDC, wideText.c_str(), static_cast<int>(wideText.length()), &textSize);
+        currentX += textSize.cx;
+        currentText = "";
+      }
+      
+      // Toggle large
+      isLarge = !isLarge;
+      currentFont = isLarge ? largeFont : (isBold ? boldFont : (isItalic ? italicFont : normalFont));
+      
+      // Update line height for large text
+      if (isLarge) {
+        maxHeight = static_cast<int>(maxHeight * 1.5);
+      }
+      
+      i++; // Skip second #
+      continue;
+    }
+    
+    // Regular character
+    currentText += line[i];
+  }
+  
+  // Print remaining text
+  if (!currentText.empty()) {
+    SelectObject(hDC, currentFont);
+    std::wstring wideText = Utf8ToWide(currentText);
+    TextOut(hDC, currentX, y, wideText.c_str(), static_cast<int>(wideText.length()));
+  }
+  
+  *lineHeight = maxHeight;
 }

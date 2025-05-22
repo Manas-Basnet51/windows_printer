@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
 import 'windows_printer_platform_interface.dart';
 
 /// An implementation of [WindowsPrinterPlatform] that uses method channels.
@@ -34,28 +33,19 @@ class MethodChannelWindowsPrinter extends WindowsPrinterPlatform {
   }
 
   @override
-  Future<bool> setPaperSize(String printerName, int paperSizeId) async {
+  Future<bool> printRawData({
+    String? printerName,
+    required Uint8List data,
+    bool useRawDatatype = true,
+  }) async {
     final bool result = await methodChannel.invokeMethod(
-      'setPaperSize',
+      'printRawData',
       {
-        'printerName': printerName,
-        'paperSizeId': paperSizeId,
+        'printerName': printerName ?? '',
+        'data': data,
+        'useRawDatatype': useRawDatatype,
       },
     );
-    return result;
-  }
-
-  @override
-  Future<bool> printRawData({String? printerName, required Uint8List data}) async {
-    final Map<String, dynamic> args = {
-      'data': data,
-    };
-    
-    if (printerName != null) {
-      args['printerName'] = printerName;
-    }
-    
-    final bool result = await methodChannel.invokeMethod('printRawData', args);
     return result;
   }
 
@@ -84,15 +74,6 @@ class MethodChannelWindowsPrinter extends WindowsPrinterPlatform {
   }
 
   @override
-  Future<Map<String, dynamic>> getPrinterDeviceSettings(String printerName) async {
-    final Map<Object?, Object?> result = await methodChannel.invokeMethod(
-      'getPrinterDeviceSettings',
-      {'printerName': printerName},
-    );
-    return _convertMap(result);
-  }
-
-  @override
   Future<bool> openPrinterProperties(String printerName) async {
     final bool result = await methodChannel.invokeMethod(
       'openPrinterProperties',
@@ -102,12 +83,19 @@ class MethodChannelWindowsPrinter extends WindowsPrinterPlatform {
   }
 
   @override
-  Future<bool> setPrinterQuality(String printerName, int quality) async {
+  Future<bool> printRichTextDocument({
+    required String printerName,
+    required String content,
+    String fontName = 'Courier New',
+    int fontSize = 12,
+  }) async {
     final bool result = await methodChannel.invokeMethod(
-      'setPrinterQuality',
+      'printRichTextDocument',
       {
         'printerName': printerName,
-        'quality': quality,
+        'content': content,
+        'fontName': fontName,
+        'fontSize': fontSize,
       },
     );
     return result;
@@ -144,4 +132,5 @@ class MethodChannelWindowsPrinter extends WindowsPrinterPlatform {
     }
     return result;
   }
+  
 }

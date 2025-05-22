@@ -74,56 +74,6 @@ void WindowsPrinterPlugin::HandleMethodCall(
     
     std::string printerName = std::get<std::string>(nameIter->second);
     result->Success(flutter::EncodableValue(PrinterManager::GetPaperSizeDetails(printerName)));
-  } else if (method_call.method_name().compare("setPaperSize") == 0) {
-    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
-    if (!arguments) {
-      result->Error("INVALID_ARGUMENTS", "Expected map arguments");
-      return;
-    }
-    
-    auto nameIter = arguments->find(flutter::EncodableValue("printerName"));
-    if (nameIter == arguments->end() || !std::holds_alternative<std::string>(nameIter->second)) {
-      result->Error("INVALID_PRINTER_NAME", "Printer name must be provided as a string");
-      return;
-    }
-    std::string printerName = std::get<std::string>(nameIter->second);
-    
-    auto paperSizeIter = arguments->find(flutter::EncodableValue("paperSizeId"));
-    if (paperSizeIter == arguments->end() || !std::holds_alternative<int>(paperSizeIter->second)) {
-      result->Error("INVALID_PAPER_SIZE", "Paper size ID must be provided as an integer");
-      return;
-    }
-    int paperSizeId = std::get<int>(paperSizeIter->second);
-    
-    result->Success(flutter::EncodableValue(PrinterManager::SetPaperSize(printerName, paperSizeId)));
-  } else if (method_call.method_name().compare("printRawData") == 0) {
-    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
-    if (!arguments) {
-      result->Error("INVALID_ARGUMENTS", "Expected map arguments");
-      return;
-    }
-    
-    // Get printer name (optional - uses default printer if not provided)
-    std::string printerName;
-    auto nameIter = arguments->find(flutter::EncodableValue("printerName"));
-    if (nameIter != arguments->end() && std::holds_alternative<std::string>(nameIter->second)) {
-      printerName = std::get<std::string>(nameIter->second);
-    }
-    
-    // Get the data to print
-    auto dataIter = arguments->find(flutter::EncodableValue("data"));
-    if (dataIter == arguments->end() || !std::holds_alternative<std::vector<uint8_t>>(dataIter->second)) {
-      result->Error("INVALID_DATA", "Data must be provided as a Uint8List");
-      return;
-    }
-    const std::vector<uint8_t>& rawData = std::get<std::vector<uint8_t>>(dataIter->second);
-    
-    bool success = PrinterManager::PrintRawData(printerName, rawData);
-    if (success) {
-      result->Success(flutter::EncodableValue(true));
-    } else {
-      result->Error("PRINT_FAILED", "Failed to print data");
-    }
   } else if (method_call.method_name().compare("printPdf") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
     if (!arguments) {
@@ -160,6 +110,40 @@ void WindowsPrinterPlugin::HandleMethodCall(
     } else {
       result->Error("PRINT_FAILED", "Failed to print PDF");
     }
+  } else if (method_call.method_name().compare("printRawData") == 0) {
+    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!arguments) {
+      result->Error("INVALID_ARGUMENTS", "Expected map arguments");
+      return;
+    }
+    
+    auto nameIter = arguments->find(flutter::EncodableValue("printerName"));
+    std::string printerName = "";
+    if (nameIter != arguments->end() && std::holds_alternative<std::string>(nameIter->second)) {
+      printerName = std::get<std::string>(nameIter->second);
+    }
+    
+    auto dataIter = arguments->find(flutter::EncodableValue("data"));
+    if (dataIter == arguments->end() || !std::holds_alternative<std::vector<uint8_t>>(dataIter->second)) {
+      result->Error("INVALID_DATA", "Data must be provided as Uint8List");
+      return;
+    }
+    std::vector<uint8_t> data = std::get<std::vector<uint8_t>>(dataIter->second);
+    
+    // Get optional useRawDatatype parameter (default: true)
+    bool useRawDatatype = true;
+    auto rawIter = arguments->find(flutter::EncodableValue("useRawDatatype"));
+    if (rawIter != arguments->end() && std::holds_alternative<bool>(rawIter->second)) {
+      useRawDatatype = std::get<bool>(rawIter->second);
+    }
+    
+    bool success = PrinterManager::PrintRawData(printerName, data, useRawDatatype);
+
+    if (success) {
+      result->Success(flutter::EncodableValue(true));
+    } else {
+      result->Error("PRINT_RAW_DATA_FAILED", "Failed to print raw data");
+    }
   } else if (method_call.method_name().compare("setDefaultPrinter") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
     if (!arguments) {
@@ -181,21 +165,6 @@ void WindowsPrinterPlugin::HandleMethodCall(
     } else {
       result->Error("SET_DEFAULT_FAILED", "Failed to set default printer");
     }
-  } else if (method_call.method_name().compare("getPrinterDeviceSettings") == 0) {
-    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
-    if (!arguments) {
-      result->Error("INVALID_ARGUMENTS", "Expected map arguments");
-      return;
-    }
-    
-    auto nameIter = arguments->find(flutter::EncodableValue("printerName"));
-    if (nameIter == arguments->end() || !std::holds_alternative<std::string>(nameIter->second)) {
-      result->Error("INVALID_PRINTER_NAME", "Printer name must be provided as a string");
-      return;
-    }
-    
-    std::string printerName = std::get<std::string>(nameIter->second);
-    result->Success(flutter::EncodableValue(PrinterManager::GetPrinterDeviceSettings(printerName)));
   } else if (method_call.method_name().compare("openPrinterProperties") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
     if (!arguments) {
@@ -217,13 +186,14 @@ void WindowsPrinterPlugin::HandleMethodCall(
     } else {
       result->Error("OPEN_PRINTER_PROPERTIES_FAILED", "Failed to open printer properties");
     }
-  } else if (method_call.method_name().compare("setPrinterQuality") == 0) {
+  } else if (method_call.method_name().compare("printRichTextDocument") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
     if (!arguments) {
       result->Error("INVALID_ARGUMENTS", "Expected map arguments");
       return;
     }
     
+    // Extract required parameters
     auto nameIter = arguments->find(flutter::EncodableValue("printerName"));
     if (nameIter == arguments->end() || !std::holds_alternative<std::string>(nameIter->second)) {
       result->Error("INVALID_PRINTER_NAME", "Printer name must be provided as a string");
@@ -231,18 +201,32 @@ void WindowsPrinterPlugin::HandleMethodCall(
     }
     std::string printerName = std::get<std::string>(nameIter->second);
     
-    auto qualityIter = arguments->find(flutter::EncodableValue("quality"));
-    if (qualityIter == arguments->end() || !std::holds_alternative<int>(qualityIter->second)) {
-      result->Error("INVALID_QUALITY", "Quality must be provided as an integer");
+    auto contentIter = arguments->find(flutter::EncodableValue("content"));
+    if (contentIter == arguments->end() || !std::holds_alternative<std::string>(contentIter->second)) {
+      result->Error("INVALID_CONTENT", "Content must be provided as a string");
       return;
     }
-    int quality = std::get<int>(qualityIter->second);
+    std::string content = std::get<std::string>(contentIter->second);
     
-    bool success = PrinterManager::SetPrinterQuality(printerName, quality);
+    // Extract optional parameters with defaults
+    std::string fontName = "Courier New";
+    auto fontNameIter = arguments->find(flutter::EncodableValue("fontName"));
+    if (fontNameIter != arguments->end() && std::holds_alternative<std::string>(fontNameIter->second)) {
+      fontName = std::get<std::string>(fontNameIter->second);
+    }
+    
+    int fontSize = 12;
+    auto fontSizeIter = arguments->find(flutter::EncodableValue("fontSize"));
+    if (fontSizeIter != arguments->end() && std::holds_alternative<int>(fontSizeIter->second)) {
+      fontSize = std::get<int>(fontSizeIter->second);
+    }
+    
+    bool success = PrinterManager::PrintRichTextDocument(printerName, content, fontName, fontSize);
+
     if (success) {
       result->Success(flutter::EncodableValue(true));
     } else {
-      result->Error("SET_QUALITY_FAILED", "Failed to set printer quality");
+      result->Error("PRINT_RICH_TEXT_FAILED", "Failed to print rich text document");
     }
   } else {
     result->NotImplemented();
