@@ -31,16 +31,15 @@ enum WPTextSize {
 /// Barcode types
 enum WPBarcodeType {
   upca(0),
-  upce(1),
+  upce(1), 
   ean13(2),
   ean8(3),
   code39(4),
   itf(5),
   codabar(6),
-  code93(7),
-  code128(8);
+  code93(72),
+  code128(73);
   
   const WPBarcodeType(this.value);
   final int value;
 }
-

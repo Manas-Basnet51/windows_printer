@@ -1,7 +1,8 @@
-
 import 'dart:typed_data';
 import 'src/windows_printer_platform_interface.dart';
+import 'windows_printer.dart';
 
+// Export all models, enums, and utilities
 export 'src/windows_printer_models.dart';
 export 'src/windows_printer_enums.dart';
 export 'src/esc_pos/windows_printer_esc_pos_generator.dart';
@@ -33,6 +34,12 @@ class WindowsPrinter {
   /// **Usage Guide:**
   /// - ✅ Thermal printers: `useRawDatatype: true` (default)
   /// - ❌ Regular printers: Use `printRichTextDocument()` instead for better quality
+  /// 
+  /// **FIXED FEATURES:**
+  /// - Hardware controls now work: cut, beep, cash drawer
+  /// - Barcode printing now works with proper ESC/POS sequences
+  /// - Image printing now supported with monochrome bitmap conversion
+  /// - QR codes enhanced with error correction and size options
   static Future<bool> printRawData({
     String? printerName, // null = use default printer
     required Uint8List data,
@@ -110,6 +117,106 @@ class WindowsPrinter {
       content: content,
       fontName: fontName,
       fontSize: fontSize,
+    );
+  }
+
+  /// Quick thermal receipt printing helper
+  /// 
+  /// **NEW**: Simplified method for quick thermal printing with fixed ESC/POS
+  /// 
+  /// Example:
+  /// ```dart
+  /// await WindowsPrinter.printThermalReceipt(
+  ///   printerName: 'Thermal Printer',
+  ///   storeName: 'My Store',
+  ///   items: [
+  ///     ReceiptItem(name: 'Coffee', price: '\$3.50'),
+  ///     ReceiptItem(name: 'Muffin', price: '\$2.75'),
+  ///   ],
+  ///   total: '\$6.25',
+  ///   openDrawer: true,
+  /// );
+  /// ```
+  static Future<bool> printThermalReceipt({
+    String? printerName,
+    required String storeName,
+    String? storeAddress,
+    String? phone,
+    required List<ReceiptItem> items,
+    required String total,
+    String? customerName,
+    String? paymentMethod,
+    bool openDrawer = false,
+    bool cutPaper = true,
+    bool addBeep = false,
+    WPPaperSize paperSize = WPPaperSize.mm80,
+  }) async {
+    final receipt = WPReceiptBuilder(wpPaperSize: paperSize)
+      .createReceipt(
+        storeName: storeName,
+        storeAddress: storeAddress ?? '',
+        phone: phone ?? '',
+        items: items,
+        total: total,
+        customerName: customerName,
+        paymentMethod: paymentMethod,
+        openDrawer: openDrawer,
+        cutPaper: cutPaper,
+        addBeep: addBeep,
+      )
+      .build();
+
+    return printRawData(
+      printerName: printerName,
+      data: Uint8List.fromList(receipt),
+      useRawDatatype: true,
+    );
+  }
+
+  /// Test hardware features (beep, drawer, cut)
+  static Future<bool> testThermalHardware({
+    String? printerName,
+    bool testBeep = true,
+    bool testDrawer = true,
+    bool testCut = true,
+  }) async {
+    final generator = WPESCPOSGenerator();
+    
+    generator.text('HARDWARE TEST', style: const WPTextStyle(
+      align: WPTextAlign.center,
+      bold: true,
+      size: WPTextSize.doubleHeightWidth
+    ));
+    
+    generator.feed();
+    
+    if (testBeep) {
+      generator.text('Testing beep...');
+      generator.beep(count: 2, duration: 3);
+      generator.feed();
+    }
+    
+    if (testDrawer) {
+      generator.text('Testing cash drawer...');
+      generator.openDrawer();
+      generator.feed();
+    }
+    
+    generator.text('Hardware test completed!', style: const WPTextStyle(
+      align: WPTextAlign.center,
+      bold: true
+    ));
+    
+    generator.feed(3);
+    
+    if (testCut) {
+      generator.cut();
+    }
+
+    return printRawData(
+      printerName: printerName,
+      data: Uint8List.fromList(generator.getBytes()),
+      useRawDatatype: true,
     );
   }
 }

@@ -91,11 +91,11 @@ Future<void> printAdvancedReceipt() async {
   generator.text('Coffee        \$3.50');
   generator.separator();
   
-  // Add barcode (Currently not working - will be fixed in next update)
-  // generator.barcode(WPBarcodeType.code128, '1234567890');
+  // Add barcode
+  generator.barcode(WPBarcodeType.code128, '123456789012');
   
-  // Add image (Currently not working - will be fixed in next update)  
-  // generator.image(simpleBitmap);
+  // Add image
+  generator.image(imageData, width, height);
   
   // Add QR code
   generator.qrCode('https://example.com/receipt');
@@ -285,39 +285,26 @@ const WPTextStyle(
 ```
 
 ### Barcode Types
-Note: Barcode functionality is currently not working properly and is being investigated. Will be fixed in the future.
 
 ```dart
-WPBarcodeType.code128
-WPBarcodeType.ean13
-WPBarcodeType.code39
-WPBarcodeType.upcA
-// ... and more (currently disabled)
+WPBarcodeType.upca   // 0
+WPBarcodeType.upce   // 1
+WPBarcodeType.ean13  // 2
+WPBarcodeType.ean8   // 3
+WPBarcodeType.code39 // 4
+WPBarcodeType.itf    // 5
+WPBarcodeType.codabar// 6
+WPBarcodeType.code93 // 72
+WPBarcodeType.code128// 73
 ```
 
 ### Image Printing
-Note: Image printing functionality is currently not working properly and is being investigated. Will be fixed in the future.
 
 ```dart
-// Currently disabled
-// generator.image(bitmapData);
+generator.image(imageData, width, height);
 ```
 
 ## Common Issues & Solutions
-
-### Known Issues
-
-**Barcode Generation Not Working**
-- Status: Currently under investigation
-- Affected: `generator.barcode()` and `WPReceiptBuilder.addBarcode()`
-- Workaround: Use QR codes or text-based product codes for now
-- Timeline: Will be fixed in the next update
-
-**Image Printing Not Working**
-- Status: Currently under investigation
-- Affected: `generator.image()` method for bitmap printing
-- Workaround: Use text-based graphics or QR codes for visual elements
-- Timeline: Will be fixed in the next update
 
 ### Thermal Printer Issues
 ```dart
@@ -329,37 +316,6 @@ await WindowsPrinter.printRawData(
 
 // Causes formatting issues:
 await WindowsPrinter.printRawData(useRawDatatype: false);
-```
-
-### Migration Guide
-
-No breaking changes - all existing code continues to work. New features are additive:
-
-```dart
-// Previous version: printRawData had native-side configuration issues
-// Version 0.2.0: Fixed native implementation and added explicit control
-
-// Old way (still works):
-await WindowsPrinter.printRawData(data: bytes);
-
-// New way - direct printer control:
-await WindowsPrinter.printRawData(
-  data: bytes,
-  useRawDatatype: true, // Direct printer control (recommended for thermal)
-);
-
-// New way - Windows-managed formatting:
-await WindowsPrinter.printRawData(
-  data: bytes,
-  useRawDatatype: false, // Let Windows handle configurations
-);
-
-// New thermal receipt builder:
-final receipt = WPReceiptBuilder()
-  .header('Store Name')
-  .item('Coffee', '\$3.50')
-  .total('\$3.50')
-  .build();
 ```
 
 ## Examples

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import '../windows_printer_enums.dart';
 import '../windows_printer_models.dart';
 
@@ -35,7 +36,6 @@ class WPESCPOSGenerator {
     style ??= const WPTextStyle();
     
     _setAlignment(style.align);
-    
     _setTextFormatting(style);
     
     _buffer.addAll(utf8.encode(text));
@@ -59,27 +59,38 @@ class WPESCPOSGenerator {
   }
   
   /// Cut the paper
-  void cut({bool partial = false}) {
+  void cut({bool partial = true}) {
     _buffer.addAll(_gs);
     _buffer.add(0x56);
+    _buffer.add(partial ? 0x01 : 0x00);
+    
+    _buffer.addAll(_gs);
+    _buffer.add(0x56);
+    _buffer.add(0x41);
     _buffer.add(partial ? 1 : 0);
   }
   
   /// Open cash drawer
-  void openDrawer({int pin = 0}) {
+  void openDrawer({int pin = 0, int onTime = 60, int offTime = 120}) {
     _buffer.addAll(_esc);
     _buffer.add(0x70);
     _buffer.add(pin);
-    _buffer.add(0x40);
-    _buffer.add(0xF0);
+    _buffer.add(onTime);
+    _buffer.add(offTime);
   }
   
   /// Make beep sound
-  void beep({int count = 1, int duration = 100}) {
+  void beep({int count = 1, int duration = 3}) {
     for (int i = 0; i < count; i++) {
       _buffer.addAll(_esc);
       _buffer.add(0x42);
-      _buffer.add(duration ~/ 50);
+      _buffer.add(duration.clamp(1, 9));
+      
+      _buffer.addAll([0x07]); // BEL character
+      
+      if (i < count - 1) {
+        _buffer.addAll(_lf);
+      }
     }
   }
   
@@ -89,29 +100,61 @@ class WPESCPOSGenerator {
     int width = 3,
     bool showText = true,
   }) {
-    _buffer.addAll(_gs);
-    _buffer.add(0x68);
-    _buffer.add(height);
+    if (!_validateBarcodeData(type, data)) {
+      return;
+    }
     
-    _buffer.addAll(_gs);
-    _buffer.add(0x77);
-    _buffer.add(width);
+    final List<int> barcodeData = utf8.encode(data);
+    
+    _setAlignment(WPTextAlign.center);
     
     _buffer.addAll(_gs);
     _buffer.add(0x48);
-    _buffer.add(showText ? 2 : 0);
+    _buffer.add(showText ? 0x02 : 0x00);
+    
+    _buffer.addAll(_gs);
+    _buffer.add(0x66);
+    _buffer.add(0x00);
+    
+    _buffer.addAll(_gs);
+    _buffer.add(0x77);
+    _buffer.add(width.clamp(2, 6));
+    
+    _buffer.addAll(_gs);
+    _buffer.add(0x68);
+    _buffer.add(height.clamp(1, 255));
     
     _buffer.addAll(_gs);
     _buffer.add(0x6B);
     _buffer.add(type.value);
-    _buffer.add(data.length);
-    _buffer.addAll(utf8.encode(data));
+    
+    if (type.value <= 6) {
+      _buffer.addAll(barcodeData);
+      _buffer.add(0x00);
+    } else {
+      // Special handling for CODE128 - ensure length is correct
+      if (type == WPBarcodeType.code128) {
+        _buffer.add(barcodeData.length & 0xFF); // Ensure single byte length
+      } else {
+        _buffer.add(barcodeData.length);
+      }
+      _buffer.addAll(barcodeData);
+    }
+    
+    _buffer.addAll(_crlf);
   }
   
   /// Add QR code
   void qrCode(String data, {int size = 6, int errorCorrection = 1}) {
+    final dataBytes = utf8.encode(data);
+    final length = dataBytes.length + 3;
+    
     _buffer.addAll(_gs);
-    _buffer.addAll([0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+    _buffer.addAll([0x28, 0x6B]);
+    _buffer.add(length & 0xFF);
+    _buffer.add((length >> 8) & 0xFF);
+    _buffer.addAll([0x31, 0x50, 0x30]);
+    _buffer.addAll(dataBytes);
     
     _buffer.addAll(_gs);
     _buffer.addAll([0x28, 0x6B, 0x03, 0x00, 0x31, 0x43]);
@@ -120,15 +163,6 @@ class WPESCPOSGenerator {
     _buffer.addAll(_gs);
     _buffer.addAll([0x28, 0x6B, 0x03, 0x00, 0x31, 0x45]);
     _buffer.add(errorCorrection);
-    
-    final dataBytes = utf8.encode(data);
-    final length = dataBytes.length + 3;
-    _buffer.addAll(_gs);
-    _buffer.addAll([0x28, 0x6B]);
-    _buffer.add(length & 0xFF);
-    _buffer.add((length >> 8) & 0xFF);
-    _buffer.addAll([0x31, 0x50, 0x30]);
-    _buffer.addAll(dataBytes);
     
     _buffer.addAll(_gs);
     _buffer.addAll([0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
@@ -188,33 +222,138 @@ class WPESCPOSGenerator {
     _buffer.addAll(bytes);
   }
   
-  /// Add image (simple monochrome bitmap)
-  void image(List<List<bool>> bitmap) {
-    final width = bitmap.isNotEmpty ? bitmap[0].length : 0;
-    final height = bitmap.length;
-    
-    if (width == 0 || height == 0) return;
-    
-    final widthBytes = (width + 7) ~/ 8;
+   /// Adds an image from pixel data
+  void image(Uint8List imageData, int width, int height) {
+    if (imageData.isEmpty || width <= 0 || height <= 0) return;
     
     _buffer.addAll(_esc);
-    _buffer.add(0x2A);
-    _buffer.add(0x00);
-    _buffer.add(width & 0xFF);
-    _buffer.add((width >> 8) & 0xFF);
+    _buffer.add(0x33);
+    _buffer.add(24);
     
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < widthBytes; x++) {
-        int byte = 0;
-        for (int bit = 0; bit < 8; bit++) {
-          final pixelX = x * 8 + bit;
-          if (pixelX < width && bitmap[y][pixelX]) {
-            byte |= (1 << (7 - bit));
+    const int bandHeight = 24;
+    
+    for (int y = 0; y < height; y += bandHeight) {
+      
+      _buffer.addAll(_esc);
+      _buffer.add(0x2A);
+      _buffer.add(33);  
+      _buffer.add(width & 0xFF); 
+      _buffer.add((width >> 8) & 0xFF); 
+      
+      for (int x = 0; x < width; x++) {
+        int byte1 = 0, byte2 = 0, byte3 = 0;
+        
+        for (int bit = 0; bit < 24; bit++) {
+          final pixelY = y + bit;
+          bool isBlack = false;
+          
+          if (pixelY < height) {
+            final pixelIndex = (pixelY * width + x) * 4;
+            if (pixelIndex + 3 < imageData.length) {
+              final r = imageData[pixelIndex];
+              final g = imageData[pixelIndex + 1];
+              final b = imageData[pixelIndex + 2];
+              final gray = (r * 0.299 + g * 0.587 + b * 0.114).round();
+              isBlack = gray < 128;
+            }
+          }
+          
+          if (isBlack) {
+            if (bit < 8) {
+              byte1 |= (1 << bit);
+            } else if (bit < 16) {
+              byte2 |= (1 << (bit - 8));
+            } else {
+              byte3 |= (1 << (bit - 16));
+            }
           }
         }
-        _buffer.add(byte);
+        
+        _buffer.add(byte1);
+        _buffer.add(byte2);
+        _buffer.add(byte3);
       }
+      
+      _buffer.addAll(_lf);
     }
-    _buffer.addAll(_lf);
+    
+    _buffer.addAll(_esc);
+    _buffer.add(0x32);
+  }
+
+
+  // Helper function: Validates barcode data based on the type.
+  bool _validateBarcodeData(WPBarcodeType type, String data) {
+    if (data.isEmpty) return false;
+    
+    switch (type) {
+      case WPBarcodeType.upca:
+        return RegExp(r'^\d{11,12}$').hasMatch(data);
+      case WPBarcodeType.upce:
+        return RegExp(r'^\d{6,8}$').hasMatch(data);
+      case WPBarcodeType.ean13:
+        return RegExp(r'^\d{12,13}$').hasMatch(data);
+      case WPBarcodeType.ean8:
+        return RegExp(r'^\d{7,8}$').hasMatch(data);
+      case WPBarcodeType.code39:
+        return RegExp(r'^[A-Z0-9 \-\.\$\/\+\%]*$').hasMatch(data) && data.length <= 255;
+      case WPBarcodeType.code128:
+        return data.length <= 255;
+      case WPBarcodeType.codabar:
+        return RegExp(r'^[0-9\-\.\$\/\+]*$').hasMatch(data) && data.length <= 255;
+      case WPBarcodeType.code93:
+        return data.length <= 255;
+      case WPBarcodeType.itf:
+        return RegExp(r'^\d+$').hasMatch(data) && data.length % 2 == 0 && data.length <= 255;
+    }
+  }
+  
+  /// Use this to test your printer
+  void printTestPage() {
+    text('=== ESC/POS TEST PAGE ===', style: const WPTextStyle(
+      align: WPTextAlign.center,
+      bold: true,
+      size: WPTextSize.doubleHeightWidth
+    ));
+    
+    feed(2);
+    
+    text('Text Formatting Test:', style: const WPTextStyle(bold: true));
+    text('Normal text');
+    text('Bold text', style: const WPTextStyle(bold: true));
+    text('Underlined text', style: const WPTextStyle(underline: true));
+    text('Large text', style: const WPTextStyle(size: WPTextSize.doubleHeight));
+    text('Inverted text', style: const WPTextStyle(invert: true));
+    
+    feed();
+    separator();
+    feed();
+    
+    text('Barcode Test (FIXED):', style: const WPTextStyle(bold: true));
+    barcode(WPBarcodeType.code128, 'HELLO123');
+    
+    feed();
+    
+    text('QR Code Test:', style: const WPTextStyle(bold: true));
+    qrCode('https://example.com');
+    
+    feed(2);
+    
+    text('Hardware Test:', style: const WPTextStyle(bold: true));
+    text('Beep test...');
+    beep(count: 2);
+    
+    feed();
+    text('Opening drawer...');
+    openDrawer();
+    
+    feed(3);
+    text('Test completed successfully!', style: const WPTextStyle(
+      align: WPTextAlign.center,
+      bold: true
+    ));
+    
+    feed(3);
+    cut();
   }
 }

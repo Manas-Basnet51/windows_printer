@@ -328,8 +328,8 @@ class _PrinterDemoPageState extends State<PrinterDemoPage> {
       
       // Hardware actions
       // .drawer() // Open cash drawer
-      // .beep()   // Confirmation beep
-      // .cut()  // Uncomment to auto-cut paper
+      .beep(count: 1,duration: 1)   // Confirmation beep
+      // .cut(partial: true)  // Uncomment to auto-cut paper
       
       .build();
       

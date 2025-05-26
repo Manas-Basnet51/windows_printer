@@ -76,7 +76,7 @@ extension SafeReceiptBuilder on WPReceiptBuilder {
     final totalText = 'TOTAL: $amount';
     
     if (totalText.length <= maxChars) {
-      return total(amount);
+      return totalAmt(amount);
     } else {
       line(totalText, style: const WPTextStyle(
         bold: true,

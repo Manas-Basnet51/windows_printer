@@ -50,3 +50,17 @@ class PaperSizeInfo {
     }
   }
 }
+
+
+/// Model for receipt items
+class ReceiptItem {
+  final String name;
+  final String price;
+  final String? description;
+  
+  const ReceiptItem({
+    required this.name,
+    required this.price,
+    this.description,
+  });
+}

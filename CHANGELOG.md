@@ -1,4 +1,14 @@
-# Changelog
+## [0.2.1] - 2025-05-26
+
+### Fixed
+* Hardware control operations (cash drawer, paper cutting, beeping) now function correctly.
+* Barcode generation now works as expected.
+* Image printing issues resolved.
+* Improved ESC/POS QR code generation for better compatibility and visual clarity.
+
+### Added
+* `createTestReceipt()` method in `WPReceiptBuilder` to test printer
+* `printTestPage()` method in `WPESCPOSGenerator` to test printer
 
 ## 0.2.0
 
