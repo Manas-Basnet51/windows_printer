@@ -16,14 +16,6 @@ A comprehensive Flutter plugin for managing and interacting with printers on Win
 - Flutter 3.0.0 or higher
 - Windows 10 or higher (recommended)
 
-## Installation
-
-Add this to your package's `pubspec.yaml` file:
-
-```yaml
-dependencies:
-  windows_printer: ^0.2.0
-```
 
 ## Quick Start
 
